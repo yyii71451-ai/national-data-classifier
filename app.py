@@ -183,7 +183,7 @@ else:
 
         st.subheader("👤 البيانات الشخصية")
         st.text_input("الاسم","محمد")
-        st.number_input("العمر"22)
+        st.number_input("العمر"26,30,22)
         st.text_input("119990389")
         st.text_input("الهيئة العامة للإحصاء")
 
