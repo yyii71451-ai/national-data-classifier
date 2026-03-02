@@ -6,3 +6,4 @@ python-Levenshtein
 matplotlib
 openpyxl
 reportlab
+reportlab
