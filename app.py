@@ -131,7 +131,8 @@ else:
         national_id = st.text_input("رقم الهوية")
         org = st.text_input("الجهة")
 
-        st.subheader("الأمان")new_pass = st.text_input("تغيير كلمة المرور", type="password")
+        st.subheader("الأمان")
+        new_pass = st.text_input("تغيير كلمة المرور", type="password")
         twofa = st.toggle("تفعيل التحقق بخطوتين (محاكاة)")
 
         if st.button("حفظ التغييرات"):
