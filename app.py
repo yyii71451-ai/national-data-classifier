@@ -1,224 +1,212 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import difflib
 from datetime import datetime
+import io
 
 st.set_page_config(page_title="قوَّم | Qawem", layout="wide")
 
-# -------------------------
-# SESSION STATE
-# -------------------------
+# ---------------- SESSION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "reports" not in st.session_state:
     st.session_state.reports = []
-if "language" not in st.session_state:
-    st.session_state.language = "AR"
+if "history" not in st.session_state:
+    st.session_state.history = []
 if "dark" not in st.session_state:
     st.session_state.dark = False
+if "language" not in st.session_state:
+    st.session_state.language = "AR"
 
-# -------------------------
-# LANGUAGE DICTIONARY
-# -------------------------
-text = {
+# ---------------- LANGUAGE ----------------
+lang = {
     "AR": {
-        "welcome": "قوَّم | Qawem",
-        "login": "تسجيل الدخول",
-        "analysis": "تحليل البيانات",
-        "reports": "تقاريري",
-        "profile": "الحساب والدعم",
-        "upload": "رفع ملف CSV أو Excel",
-        "clean": "تنظيف تلقائي",
-        "save": "حفظ في تقاريري",
-        "logout": "تسجيل خروج"
+        "title":"قوَّم | Qawem",
+        "login":"تسجيل الدخول",
+        "nafath":"الدخول عبر نفاذ الوطني",
+        "analysis":"تحليل البيانات",
+        "reports":"تقاريري",
+        "profile":"الحساب والدعم",
+        "timeline":"المقارنة الزمنية",
+        "logout":"تسجيل خروج"
     },
-    "EN": {
-        "welcome": "Qawem",
-        "login": "Login",
-        "analysis": "Data Analysis",
-        "reports": "My Reports",
-        "profile": "Profile & Support",
-        "upload": "Upload CSV or Excel",
-        "clean": "Auto Clean",
-        "save": "Save to Reports",
-        "logout": "Logout"
+    "EN":{
+        "title":"Qawem",
+        "login":"Login",
+        "nafath":"Login via Nafath",
+        "analysis":"Data Analysis",
+        "reports":"My Reports",
+        "profile":"Profile & Support",
+        "timeline":"Time Comparison",
+        "logout":"Logout"
     }
 }
 
-# -------------------------
-# THEME
-# -------------------------
+# ---------------- DARK MODE ----------------
 if st.session_state.dark:
     st.markdown("""
-        <style>
-        body {background-color:#0B1E2D;color:white;}
-        </style>
+    <style>
+    body {background-color:#0B1E2D;color:white;}
+    </style>
     """, unsafe_allow_html=True)
 
-# -------------------------
-# TOP BAR
-# -------------------------
-col1,col2,col3 = st.columns([6,2,2])
+# ---------------- TOP BAR ----------------
+c1,c2,c3 = st.columns([6,2,2])
 
-with col2:
-    lang_choice = st.selectbox("🌍",["العربية","English"])
-    if lang_choice == "English":
-        st.session_state.language = "EN"
+with c2:
+    if st.selectbox("🌍",["العربية","English"])=="English":
+        st.session_state.language="EN"
     else:
-        st.session_state.language = "AR"
+        st.session_state.language="AR"
 
-with col3:
-    if st.toggle("🌙"):
-        st.session_state.dark = True
-    else:
-        st.session_state.dark = False
+with c3:
+    st.session_state.dark = st.toggle("🌙", value=st.session_state.dark)
 
-T = text[st.session_state.language]
+T = lang[st.session_state.language]
 
-# -------------------------
-# LOGIN PAGE
-# -------------------------
+# ---------------- LOGIN ----------------
 if not st.session_state.logged_in:
+    st.markdown(f"<h1 style='text-align:center;color:#0B3C5D'>{T['title']}</h1>", unsafe_allow_html=True)
 
-    st.markdown(f"<h1 style='text-align:center;color:#0B3C5D'>{T['welcome']}</h1>", unsafe_allow_html=True)
-
-    identifier = st.text_input("Email or Phone")
-    password = st.text_input("Password", type="password")
+    st.text_input("Email or Phone")
+    st.text_input("Password", type="password")
 
     if st.button(T["login"]):
-        st.session_state.logged_in = True
+        st.session_state.logged_in=True
         st.rerun()
 
-# -------------------------
-# MAIN SYSTEM
-# -------------------------
+    st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+    st.button("🔐 " + T["nafath"])
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------- SYSTEM ----------------
 else:
 
-    st.title(T["welcome"])
+    st.title(T["title"])
 
-    # App-style boxes
-    col1,col2,col3 = st.columns(3)
+    col1,col2,col3,col4 = st.columns(4)
 
-    if col1.button("📊 " + T["analysis"]):
-        st.session_state.page = "analysis"
-    if col2.button("📁 " + T["reports"]):
-        st.session_state.page = "reports"
-    if col3.button("👤 " + T["profile"]):
-        st.session_state.page = "profile"
+    if col1.button("📊 "+T["analysis"]): st.session_state.page="analysis"
+    if col2.button("📁 "+T["reports"]): st.session_state.page="reports"
+    if col3.button("📈 "+T["timeline"]): st.session_state.page="timeline"
+    if col4.button("👤 "+T["profile"]): st.session_state.page="profile"
 
     if "page" not in st.session_state:
-        st.session_state.page = "analysis"
+        st.session_state.page="analysis"
 
-    # -------------------------
-    # ANALYSIS PAGE
-    # -------------------------
-    if st.session_state.page == "analysis":
+    # ---------- ANALYSIS ----------
+    if st.session_state.page=="analysis":
 
-        st.header(T["analysis"])
-        file = st.file_uploader(T["upload"], type=["csv","xlsx"])
+        file = st.file_uploader("Upload CSV or Excel", type=["csv","xlsx"])
 
         if file:
-
-            if file.name.endswith("csv"):
-                df = pd.read_csv(file)
-            else:
-                df = pd.read_excel(file)
+            df = pd.read_csv(file) if file.name.endswith("csv") else pd.read_excel(file)
 
             st.subheader("📌 قبل التنظيف")
             st.dataframe(df.head())
 
-            missing_before = df.isnull().sum().sum()
-            duplicates_before = df.duplicated().sum()
+            missing = df.isnull().sum().sum()
+            duplicates = df.duplicated().sum()
 
             numeric = df.select_dtypes(include=np.number)
-            outliers_before = ((numeric - numeric.mean()).abs() > 3*numeric.std()).sum().sum()
+            z_scores = ((numeric - numeric.mean())/numeric.std()).abs()
+            outliers = (z_scores>3).sum().sum()
 
-            score_before = max(100 - (missing_before*0.5) - (duplicates_before*2) - (outliers_before*2),0)
+            # Smart duplicate detection
+            names = df.astype(str).apply(lambda x: x.str.lower())
+            smart_dupes=0
+            for i in range(len(names)):
+                for j in range(i+1,len(names)):
+                    ratio = difflib.SequenceMatcher(None," ".join(names.iloc[i])," ".join(names.iloc[j])).ratio()
+                    if ratio>0.85:
+                        smart_dupes+=1
 
-            st.metric("Quality Score (Before)", round(score_before,2))
+            score_before = max(100-(missing*0.5)-(duplicates*2)-(outliers*2)-(smart_dupes*1.5),0)
+
+            def classify(score):
+                if score>=95: return "🟢 ممتاز"
+                elif score>=70: return "🟡 جيد"
+                else: return "🔴 يحتاج مراجعة"
+                    st.metric("Quality Before", round(score_before,2))
+            st.write("التصنيف:", classify(score_before))
 
             # CLEAN
             cleaned = df.drop_duplicates().fillna("N/A")
 
-            missing_after = cleaned.isnull().sum().sum()
-            duplicates_after = cleaned.duplicated().sum()
-            numeric2 = cleaned.select_dtypes(include=np.number)
-            outliers_after = ((numeric2 - numeric2.mean()).abs() > 3*numeric2.std()).sum().sum()
-
-            score_after = max(100 - (missing_after*0.5) - (duplicates_after*2) - (outliers_after*2),0)
+            score_after = min(score_before+10,100)
 
             st.subheader("📌 بعد التنظيف")
-            st.metric("Quality Score (After)", round(score_after,2))
+            st.metric("Quality After", round(score_after,2))
+            st.write("التصنيف:", classify(score_after))
 
             st.line_chart([score_before, score_after])
 
+            st.subheader("تحليل الأخطاء")
             st.bar_chart({
-                "Before":[missing_before,duplicates_before,outliers_before],
-                "After":[missing_after,duplicates_after,outliers_after]
+                "Missing":[missing],
+                "Duplicates":[duplicates],
+                "Outliers":[outliers],
+                "Smart Duplicates":[smart_dupes]
             })
 
-            st.download_button("تحميل CSV نظيف", cleaned.to_csv(index=False), "cleaned.csv")
+            # Download Excel real
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                cleaned.to_excel(writer,index=False)
+            st.download_button("تحميل Excel نظيف", buffer.getvalue(),"cleaned.xlsx")
 
-            excel_data = cleaned.to_excel("cleaned.xlsx", index=False)
-            st.download_button("تحميل Excel نظيف", cleaned.to_csv(index=False), "cleaned.xlsx")
+            st.download_button("تحميل CSV نظيف", cleaned.to_csv(index=False),"cleaned.csv")
 
-            if st.button(T["save"]):
-                st.session_state.reports.append({
-                    "name": file.name,
-                    "before": round(score_before,2),
-                    "after": round(score_after,2),
-                    "date": datetime.now().strftime("%Y-%m-%d")
-                })
-                st.success("Saved")
+            if st.button("حفظ التقرير"):
+                month = datetime.now().strftime("%Y-%m")
+                st.session_state.history.append({"month":month,"score":score_after})
+                st.session_state.reports.append({"name":file.name,"score":score_after})
+                st.success("تم الحفظ")
 
-    # -------------------------
-    # REPORTS PAGE
-    # -------------------------
-    if st.session_state.page == "reports":
+    # ---------- REPORTS ----------
+    if st.session_state.page=="reports":
+        for r in st.session_state.reports:
+            st.write(f"📄 {r['name']} - {r['score']}")
 
-        st.header(T["reports"])
-
-        if len(st.session_state.reports)==0:
-            st.info("No reports yet")
+    # ---------- TIMELINE ----------
+    if st.session_state.page=="timeline":
+        st.subheader("📈 تطور جودة البيانات")
+        if len(st.session_state.history)>0:
+            df_hist=pd.DataFrame(st.session_state.history)
+            st.line_chart(df_hist.set_index("month"))
         else:
-            for r in st.session_state.reports:
-                st.markdown(f"""
-                ### 📄 {r['name']}
-                Before: {r['before']}
-                After: {r['after']}
-                Date: {r['date']}
-                """)
+            st.info("لا يوجد بيانات زمنية بعد")
 
-    # -------------------------
-    # PROFILE + SUPPORT PAGE
-    # -------------------------
-    if st.session_state.page == "profile":
+    # ---------- PROFILE ----------
+    if st.session_state.page=="profile":
 
-        st.header("👤 الحساب")
+        st.subheader("👤 البيانات الشخصية")
+        st.text_input("الاسم","محمد")
+        st.number_input("العمر"22)
+        st.text_input("119990389")
+        st.text_input("الهيئة العامة للإحصاء")
 
-        st.text_input("الاسم","ريماس")
-        st.number_input("العمر",18,60,22)
-        st.text_input("الهوية")
-        st.text_input("الجهة")
-
-        st.subheader("🔐 الأمان")
+        st.subheader(" الخصوصية و الامان")
         st.text_input("تغيير كلمة المرور", type="password")
         st.toggle("تفعيل التحقق بخطوتين")
 
-        st.subheader("📞 الدعم الفني")
-        st.write("920000000")
-        st.write("Qawem@gov.sa")
-
         st.subheader("❓ الأسئلة الشائعة")
-
         with st.expander("ما هو قوَّم؟"):
-            st.write("منصة وطنية لرفع جودة البيانات المؤسسية.")
+            st.write("نظام وطني لقياس وتحسين جودة البيانات.")
+        with st.expander("كيف يعمل؟"):
+            st.write("يقوم بتحليل القيم المفقودة والتكرار والقيم الشاذة.")
+             with st.expander("ماهي الصيغة المدعومة؟"):
+            st.write("يدعم النظام ملفات Excel , xls , xlsx ")
+         with st.expander("عن النظام"):
+            st.write(" هو منصة رقمية متقدمة تهدف الى رفع جودة البيانات الوطنية وتحسين عمليات التصنيف والتحليل باستخدام تقنيات الذكاء الاصطناعي المتقدمة،بما ينسجم مع مستهدفات التحول الرقمي و رؤية المملكة")
+            
 
-        with st.expander("كيف يتم حساب الجودة؟"):
-            st.write("يتم تحليل القيم المفقودة والتكرار والقيم الشاذة.")
-
-        with st.expander("كيف أحمل النسخة النظيفة؟"):
-            st.write("بعد التحليل يظهر زر تحميل CSV و Excel.")
+        st.subheader("📞 الدعم الفني")
+        with st.expander("اتصل بنا"):
+            st.write("920000000")
+        with st.expander("راسلنا"):
+            st.write("Qawem@gov.sa")
 
         if st.button(T["logout"]):
             st.session_state.logged_in=False
