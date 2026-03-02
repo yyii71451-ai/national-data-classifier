@@ -128,7 +128,7 @@ else:
                 if score>=95: return "🟢 ممتاز"
                 elif score>=70: return "🟡 جيد"
                 else: return "🔴 يحتاج مراجعة"
-                    st.metric("Quality Before", round(score_before,2))
+            st.metric("Quality Before", round(score_before,2))
             st.write("التصنيف:", classify(score_before))
 
             # CLEAN
